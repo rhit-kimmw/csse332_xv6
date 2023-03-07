@@ -32,7 +32,10 @@
 int add_with_pointers(int *val1, int *val2)
 {
   /* TODO: ADD YOUR CODE HERE */
-  return 0;
+  int sum;
+  sum = *val1 + *val2;
+
+  return sum;
 }
 
 void test_add_with_pointers(void)
@@ -53,6 +56,13 @@ void test_add_with_pointers(void)
 void ensure_correct_order(int *should_be_smaller, int *should_be_larger)
 {
   /* TODO: ADD YOUR CODE HERE */
+  int temp;
+  if (*should_be_smaller > *should_be_larger) 
+  {
+      temp = *should_be_smaller;
+      *should_be_smaller = *should_be_larger;
+      *should_be_larger = temp;
+  }
 }
 
 void test_ensure_correct_order(void)
@@ -82,6 +92,14 @@ void test_ensure_correct_order(void)
 int special_equals(int *val1, int *val2)
 {
   /* TODO: ADD YOUR CODE HERE */
+  if(val1 == val2)
+  {
+    return 2;
+  }
+  else if(*val1 == *val2)
+  {
+    return 1;
+  }
   return 0;
 }
 
@@ -120,7 +138,18 @@ void test_special_equals(void)
  */
 void string_with_q(char *s1, char *s2, char **output)
 {
+  *output = 0;
   /* TODO: ADD YOUR CODE HERE */
+  for (int i = 0; s1[i] != '\0'; i++) {
+    if (s1[i] == 'Q') {
+      *output = s1;
+      return;
+    }
+    if (s2[i] == 'Q') {
+      *output = s2;
+      return;
+    }
+  }
 }
 
 void test_string_with_q(void)
