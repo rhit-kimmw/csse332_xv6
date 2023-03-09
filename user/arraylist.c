@@ -51,8 +51,12 @@ struct arraylist {
  */
 struct arraylist *al_new(void)
 {
-  /* TODO: Add your code here. */
-  return 0;
+  struct arraylist *list = malloc(sizeof(struct arraylist));
+  list -> list = malloc(sizeof(int)*DEF_ARRAY_LIST_CAPACITY);
+  list->size = 0;
+  list->capacity = DEF_ARRAY_LIST_CAPACITY;
+
+  return list;
 }
 
 /**
@@ -65,7 +69,8 @@ struct arraylist *al_new(void)
  */
 void al_free(struct arraylist *al)
 {
-  /* TODO: Add your code here. */
+  free((*al).list);
+  free(al);
 }
 
 /**
@@ -81,7 +86,16 @@ void al_free(struct arraylist *al)
 int al_get_at(struct arraylist *al, int pos)
 {
   /* TODO: Add your code here. */
-  return 0;
+  int val = -1;
+  if((al->size) <= pos || pos < 0)
+  {
+    val = -1;
+  }
+  else
+  {
+    val = *((al->list)+pos);
+  }
+  return val;
 }
 
 /**
@@ -99,6 +113,14 @@ int al_get_at(struct arraylist *al, int pos)
 void al_resize(struct arraylist *al)
 {
   /* TODO: Add your code here. */
+  int *new_list = malloc(sizeof(int) * al->capacity * 2); // allocate memory for the new list
+  for(int i = 0; i < al->size; i++) {
+      new_list[i] = al->list[i]; // copy elements from the old list to the new list
+  }
+  free(al->list); // free the old list
+  al->list = new_list; // set the pointer to the new list
+  al->capacity *= 2; // update the capacity of the struct
+
 }
 
 /**
@@ -117,6 +139,12 @@ void al_resize(struct arraylist *al)
 void al_append(struct arraylist *al, int val)
 {
   /* TODO: Add your code here. */
+  if (al->size == al->capacity) { // check if the list is already at capacity
+      al_resize(al); // if yes, resize the list
+  }
+  al->list[al->size] = val; // append the new element at the end of the list
+  al->size++; // update the size of the list
+  
 }
 
 /**
@@ -139,7 +167,7 @@ int main(int argc, char **argv)
 {
   struct arraylist *al;
 
-  /* test creating a new array list */
+  // /* test creating a new array list */
   al = al_new();
   rhassert(al != 0);
   rhassert_int_equals(al->size, 0);
