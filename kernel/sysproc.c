@@ -43,8 +43,13 @@ sys_sbrk(void)
 
   argint(0, &n);
   addr = myproc()->sz;
-  if(growproc(n) < 0)
-    return -1;
+  // Activity: We will not actually grow the process's memory unless we really
+  // want to. More trickery for the OS point of view.
+  // if(growproc(n) < 0)
+  //   return -1;
+  // Instead, we will just increase the process's size without actually growing
+  // it now.
+  myproc()->sz += n;
   return addr;
 }
 
