@@ -102,6 +102,11 @@ sys_getmaping(void)
   // translate a virtual address (p) into a physical address (va)
   //  Hint: Should be a one liner.
 
+  // p is the virtual address (fame address)
+  // find pa, which is the physical frame number
+  
+  //myproc() : return a reference to the process who made the call
+  pa = walkaddr(myproc()->pagetable, p);
   // write the pa to the process
   if(copyout(myproc()->pagetable, dst, (char*)&pa, sizeof(uint64)) < 0) {
     printf("[syscall: getamaping error:] could not write back to user\n");

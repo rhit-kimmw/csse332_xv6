@@ -1,0 +1,116 @@
+diff --git a/user/rhmalloc.c b/user/rhmalloc.c
+index 930680d..74cd8a3 100644
+--- a/user/rhmalloc.c
++++ b/user/rhmalloc.c
+@@ -53,6 +53,20 @@ metadata_t *freelist_head(void) { return freelist; }
+  */
+ void *heap_start(void) { return heap_mem_start; }
+ 
++
++void *initialize_freelist(void *heap_start, unsigned heap_size)
++{
++  //create a metadata_t structure 
++  metadata_t *block = (metadata_t *)heap_start;
++  block->s.size = ALIGN(heap_size - sizeof(metadata_t));
++  block->s.in_use = 0;
++  block->s.next = 0;
++  block->s.prev = 0;
++
++  freelist = block;
++  return 0;
++}
++
+ /**
+  * Initialize the rh memroy allocator system.
+  *
+@@ -73,7 +87,7 @@ uint8 rhmalloc_init(void)
+   }
+ 
+   /* TODO: Add code here to initialize freelist and its content. */
+-  
++  initialize_freelist(heap_mem_start, MAX_HEAP_SIZE);
+ 
+   return 0;
+ }
+@@ -106,10 +120,54 @@ void *rhmalloc(uint32 size)
+     if(rhmalloc_init()) return 0;
+ 
+   /* TODO: Add you malloc code here. */
++  size = ALIGN(size);
++  //round up to multiple of alignment
++  metadata_t *current_block = freelist;
++  //search freelist which fit the requrest size
++  while(current_block != 0)
++  {
++    //find the block
++    if (!current_block->s.in_use && current_block->s.size >= size)
++    {
++      //the size is greater than the requested size
++      if(current_block->s.size >= size + sizeof(metadata_t) + ALIGNMENT)
++      {
++        metadata_t *new_block = (metadata_t *)((char*)current_block + sizeof(metadata_t) + size);
++        new_block->s.size = current_block->s.size - size - sizeof(metadata_t);
++        new_block->s.in_use = 0;
++        new_block->s.prev = current_block;
++        new_block->s.next = current_block->s.next;
++        if (new_block->s.next != 0)
++        {
++          new_block->s.next->s.prev = new_block;
++        }
++        current_block->s.next = new_block;
++        current_block->s.size = size;
++      }
++
++      //current block in use
++      current_block->s.in_use = 1;
++      return (void *)((char *)current_block + sizeof(metadata_t));
++    }
++  
++    current_block = current_block->s.next;
++  }
+ 
++  //if no block found, return error
+   return 0;
+ }
+ 
++//merge block function
++metadata_t *merge_blocks(metadata_t *block_first, metadata_t *block_second)
++{
++  block_first->s.size +=(block_second->s.size + sizeof(metadata_t));
++  block_first->s.next = block_second->s.next;
++  if(block_second->s.next != 0)
++    block_second->s.next->s.prev = block_first;
++
++  return block_first;
++}
++
+ /**
+  * Free a memory region and return it to the memory allocator.
+  *
+@@ -122,4 +180,26 @@ void *rhmalloc(uint32 size)
+ void rhfree(void *ptr)
+ {
+   /* TODO: Add your free code here. */
++
++  //assuming a pointer is pointing to the metadata of the block
++  if (ptr == 0)
++    return;
++
++  metadata_t *current_block = (metadata_t *)((char *)ptr - sizeof(metadata_t));
++  current_block->s.in_use = 0;
++  
++  //coalescing
++  if(current_block->s.prev != 0 && !current_block->s.prev->s.in_use)
++  {
++    current_block = merge_blocks(current_block->s.prev, current_block);
++  }
++
++  if(current_block->s.next != 0 && !current_block->s.next->s.in_use)
++  {
++    current_block = merge_blocks(current_block, current_block->s.next);
++  }
++
++  
++
++  
+ }
