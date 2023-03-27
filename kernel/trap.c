@@ -67,7 +67,21 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  } else if(r_scause() == 15)
+  {
+    printf("Page fault occurred from process %s at address %p\n", p->name, r_stval());
+    // setkilled(p);
+    //give process the pages it asked for
+    uint64 va = r_stval();
+    uint64 page_addr = PGROUNDDOWN(va); //make lower 12 bits 0x000.
+    // printf("new Page starts at %p\n", page_addr);
+    // setkilled(p);
+    void *pa = kalloc();//allocated frame from physical memory
+    mappages(p->pagetable, page_addr, 4096, (uint64) pa, PTE_R|PTE_W|PTE_U);
+    
+  }
+    
+  else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);

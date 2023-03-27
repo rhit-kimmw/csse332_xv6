@@ -1,0 +1,229 @@
+diff --git a/user/buddy_test.c b/user/buddy_test.c
+index 81a3dd8..4a16c22 100644
+--- a/user/buddy_test.c
++++ b/user/buddy_test.c
+@@ -144,7 +144,7 @@ void test_wrong_size_coalesce(void)
+ 
+   rhassert_int_equals(p4 - p1, 128);
+ }
+-
++void print_free_blocks();
+ void test_gracefully_run_out_of_memory(void)
+ {
+   reset_if_needed();
+diff --git a/user/rhmalloc.c b/user/rhmalloc.c
+index 48e6efc..e46e92f 100644
+--- a/user/rhmalloc.c
++++ b/user/rhmalloc.c
+@@ -41,6 +41,12 @@ static void *heap_mem_start = 0;
+ */
+ static int initialized = 0;
+ 
++/* Personal global variables*/
++///////////////////////////////////////////////
++static int min_chunk_size = 32;
++
++///////////////////////////////////////////////
++
+ /**
+  * For testing purposes, exposed the initialization bit.
+ */
+@@ -95,7 +101,13 @@ uint8 rhmalloc_init(void)
+ 
+   // TODO: Add your initialization code here, but do not change anything above
+   // this line.
+-
++  // printf("orig: %p, heap_mem: %p, p: %p",original_start, heap_mem_start, p);
++  /* Initialize the freelist */
++  metadata_t *heap_manager = (metadata_t *)heap_mem_start;
++  heap_manager->size = MAX_HEAP_SIZE;
++  heap_manager->in_use = 0;
++  heap_manager->next = 0;
++  heap_manager->prev = 0;
+   return 0;
+ }
+ 
+@@ -120,7 +132,6 @@ void rhfree_all(void)
+ 
+   // TODO: Add your destruction code here, but do not change anything above this
+   // line.
+-
+ }
+ 
+ /**
+@@ -137,9 +148,89 @@ void rhfree_all(void)
+ void *get_buddy(void *ptr, int exponent)
+ {
+   // TODO: Add your code here.
+-  return (void*)0;
++  
++  metadata_t *buddy = (metadata_t *)((uint64)ptr ^ (uint64) 1<<exponent);
++  if (ptr < TARGET_START || ptr > TARGET_START + MAX_HEAP_SIZE){
++    return (void *)((uint64)ptr ^ (uint64) 1<<exponent);
++  }
++  else
++  {
++    metadata_t *meta = (metadata_t *)ptr;
++    buddy->size = 1<<exponent;
++    buddy->next = meta->next;
++    buddy->prev = meta;
++    buddy->in_use = 0;
++
++    return (void *)buddy;
++  }
+ }
+ 
++
++/* below is the functions created for malloc*/
++//////////////////////////////////////////////////
++
++//returns the exponent
++int get_exponent(int size)
++{
++  int exponent = 0;
++  while(size >>= 1)
++  {
++    exponent++;
++  }
++
++  return exponent;
++}
++
++//returns the valid size which meets the criteria
++int valid_chunk_size(int size)
++{
++  int valid_size;
++  if (size <= min_chunk_size)
++  {
++    valid_size = min_chunk_size;
++  }
++  else{
++    int power_of_2 = 1;
++    while(size > power_of_2)
++    {
++      power_of_2*=2;
++    }
++    valid_size = power_of_2;
++    
++  }
++  return valid_size;
++}
++
++void print_free_blocks()
++{
++  printf("print blocks\n");
++  metadata_t* heap_manager = heap_mem_start;
++  while(heap_manager != 0)
++  {
++    if(heap_manager->in_use)
++    {
++      printf("%p, %d, used\n", heap_manager, heap_manager->size);
++    }
++    else
++    {
++      printf("%p, %d, not used\n", heap_manager, heap_manager->size);
++    }
++    heap_manager = heap_manager->next;
++  }
++}
++
++metadata_t *merge_blocks(metadata_t *block_first, metadata_t *block_second)
++{
++  block_first->size +=(block_second->size + sizeof(metadata_t));
++  block_first->next = block_second->next;
++  if(block_second->next != 0)
++    block_second->next->prev = block_first;
++
++  return block_first;
++}
++
++//////////////////////////////////////////////////
++
+ /**
+  * Allocate size bytes and return a pointer to start of the region. 
+  * 
+@@ -147,15 +238,50 @@ void *get_buddy(void *ptr, int exponent)
+  */
+ void *rhmalloc(uint32 size)
+ {
+-  /* Check if we need to call rhmalloc_init and call it if needed. */
++  // /* Check if we need to call rhmalloc_init and call it if needed. */
+   if(!initialized)
+     if(rhmalloc_init()) return 0;
+ 
+   // TODO: Add your malloc code here.
++  //get appropriate chunk size
++  int chunk_size = valid_chunk_size(size);
++  //find a free block which is smallest and can fit the assigned size
++  metadata_t *heap_manager = heap_mem_start;
++  if(chunk_size > MAX_HEAP_SIZE){
++    return 0;
++  }
++  if(chunk_size == MAX_HEAP_SIZE && heap_manager->size < chunk_size)
++  {
++    return 0;
++  }
++
++  while(!(heap_manager->in_use == 0 && heap_manager->size >= chunk_size))
++  {
++    heap_manager = heap_manager->next;
++    if((void*)heap_manager > heap_mem_start + MAX_HEAP_SIZE || (void*)heap_manager < heap_mem_start)
++    {
++      return 0;
++    }
++  }
++
+ 
+-  return (void*)0;
++  metadata_t *new_heap = heap_manager;
++  while(heap_manager->size > chunk_size)
++  {
++    new_heap = (metadata_t *) get_buddy((void *)heap_manager, get_exponent(heap_manager->size)-1);
++    if(heap_manager->next != 0)
++    {
++      heap_manager->next->prev = new_heap;
++    }
++    heap_manager->size = heap_manager->size / 2;
++    heap_manager->next = new_heap;
++  }
++
++  heap_manager->in_use = 1;
++  return (void*)(heap_manager);
+ }
+ 
++
+ /**
+  * Free a memory region and return it to the memory allocator.
+  *
+@@ -168,4 +294,31 @@ void *rhmalloc(uint32 size)
+ void rhfree(void *ptr)
+ {
+   // TODO: Add your free code here.
++  metadata_t *heap_manager = (metadata_t *)ptr;
++  heap_manager->in_use = 0;
++  metadata_t *buddy = (metadata_t *) ((uint64)ptr ^ (uint64) 1<<get_exponent(heap_manager->size));
++  metadata_t *merged_block = heap_manager;
++
++
++  while (!buddy->in_use && heap_manager->size < MAX_HEAP_SIZE)
++  {
++    if(heap_manager > buddy)
++    {
++      merged_block = buddy;
++      merged_block->size *= 2;
++      merged_block->next = heap_manager->next;
++      if(heap_manager->next != 0)
++        heap_manager->next->prev = merged_block;
++    }
++
++    else{
++      merged_block = heap_manager;
++      merged_block->size *= 2;
++      merged_block->next = buddy->next;
++      if(buddy->next != 0)
++        buddy->next->prev = merged_block;
++    }
++
++    buddy = (metadata_t *) ((uint64)merged_block ^ (uint64) 1<<get_exponent(heap_manager->size));
++  }
+ }
