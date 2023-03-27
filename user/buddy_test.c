@@ -144,7 +144,7 @@ void test_wrong_size_coalesce(void)
 
   rhassert_int_equals(p4 - p1, 128);
 }
-
+void print_free_blocks();
 void test_gracefully_run_out_of_memory(void)
 {
   reset_if_needed();
